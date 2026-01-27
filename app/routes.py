@@ -28,3 +28,21 @@ def create_story():
     db.session.add(new_story)
     db.session.commit()
     return jsonify(new_story.to_dict()), 201
+
+@api_bp.route('/stories/<int:story_id>/start', methods=['GET'])
+def get_story_start(story_id):
+    """Fetches the first page of a specific story."""
+    story = Story.query.get_or_404(story_id)
+    if not story.start_page_id:
+        return jsonify({"error": "This story has no start page defined"}), 400
+
+    # We find the start page and return its data
+    page = Page.query.get(story.start_page_id)
+    return jsonify(page.to_dict())
+
+
+@api_bp.route('/pages/<int:page_id>', methods=['GET'])
+def get_page(page_id):
+    """Fetches a specific page and its choices."""
+    page = Page.query.get_or_404(page_id)
+    return jsonify(page.to_dict())
