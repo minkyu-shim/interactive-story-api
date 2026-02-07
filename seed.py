@@ -10,12 +10,12 @@ app = create_app()
 STORY_DATA_KR = {
   "project_meta": {
     "title": "[KR] 런타임 에러 : 연애는 예외처리가 안 되나요?",
-    "version": "1.3.0",
+    "version": "1.6.0 (Narrative Flow Patch)",
     "genre": "하이퍼 리얼리즘 공대생 로맨스",
     "author": "Minkyu + Gemini"
   },
   "player_state": {
-    "name": "주인공",
+    "name": "진",
     "department": "컴퓨터공학과 3학년",
     "status": {
       "academic": "학사 경고 (전필 '알고리즘' F 위기)",
@@ -33,7 +33,32 @@ STORY_DATA_KR = {
       "type": "narrative",
       "title": "프롤로그 : 인생에 블루스크린이 떴다",
       "background": "dark_room_computer_smoke",
-      "text": "내 인생은 'Segmentation Fault (Core Dumped)'다. \n\n전공 필수 알고리즘은 재수강 확정, 유일한 친구였던 RTX 5070은 '사이버펑크 2077'을 돌리다 장렬히 전사했다. \n\nGTA 6 출시까지 6개월... 내장 그래픽으로 버티는 삶은 지옥이다.",
+      "text": "내 인생은 'Segmentation Fault' 다. \n\n전공 필수 알고리즘은 재수강 확정, 유일한 친구였던 RTX 5070은 '사이버펑크 2077'을 돌리다 장렬히 전사했다. \n\nGTA 6 출시까지 6개월... 내장 그래픽으로 버티는 삶은 지옥이다.",
+      "next_node": "node_01_5_professor_call"
+    },
+    {
+      "id": "node_01_5_professor_call",
+      "type": "dialogue",
+      "title": "이벤트 : 교수님의 호출",
+      "background": "professor_office",
+      "characters": [
+        "Professor Park"
+      ],
+      "text": "박 교수님 연구실로 불려갔다. 에어컨 바람이 유난히 차갑다.",
+      "dialogue": [
+        {
+          "speaker": "박 교수",
+          "text": "자네 중간고사 점수 꼬라지가 이게 뭔가? 12점? 공부 대신 뇌로 비트코인 채굴이라도 했나?"
+        },
+        {
+          "speaker": "진",
+          "text": "저... 하드웨어 이슈가 좀 있어서..."
+        },
+        {
+          "speaker": "박 교수",
+          "text": "변명은. 자네 멘토로 과탑 붙여줄 테니 낙제하기 싫으면 가서 배워. 당장 실습실로 튀어가."
+        }
+      ],
       "next_node": "node_02_common_day"
     },
     {
@@ -41,14 +66,14 @@ STORY_DATA_KR = {
       "type": "dialogue",
       "title": "공통 루트 (낮) : 차수연과의 만남",
       "background": "university_lab_room",
-      "text": "과방 구석에서 한숨을 쉬고 있는데, 과탑 차수연이 내 모니터를 보며 인상을 찌푸린다.",
+      "text": "쫓겨나듯 실습실로 갔다. 구석에서 날카로운 안경을 쓴 여학생이 발을 구르며 기다리고 있다.",
       "characters": [
         "Cha Sooyeon"
       ],
       "dialogue": [
         {
           "speaker": "차수연",
-          "text": "야, 너 코드를 발로 짰냐? O(n^2)로 돌리면 서버 터지는 거 몰라? 이중 for문 당장 걷어내."
+          "text": "네가 그 '12점'짜리야? 교수님이 너 사람 좀 만들어 놓으라더라. \n...야, 너 코드를 발로 짰냐? O(n^2)로 돌리면 서버 터지는 거 몰라? 이중 for문 당장 걷어내."
         },
         {
           "speaker": "system",
@@ -104,7 +129,7 @@ STORY_DATA_KR = {
       "affinity_change": {
         "cha_sooyeon": 15
       },
-      "next_node": "node_03_common_night"
+      "next_node": "node_02_5_work_login"
     },
     {
       "id": "node_02_fail",
@@ -127,20 +152,29 @@ STORY_DATA_KR = {
       "affinity_change": {
         "cha_sooyeon": -5
       },
+      "next_node": "node_02_5_work_login"
+    },
+    {
+      "id": "node_02_5_work_login",
+      "type": "narrative",
+      "title": "전환 : 현실 로그인",
+      "background": "street_night_neon",
+      "text": "학교 일과는 끝났지만, 내 하루는 끝나지 않았다. \n\n사망한 그래픽카드(RTX 5070)를 되살리려면 현금이 필요하다. 야간 알바를 위해 '넥서스 PC방'으로 향한다. \n\n라면 냄새와 기계식 키보드 소리... 파밍의 시간이다.",
       "next_node": "node_03_common_night"
     },
     {
       "id": "node_03_common_night",
       "type": "dialogue",
-      "title": "공통 루트 (밤) : 이유리와의 비밀",
+      "title": "공통 루트 (밤) : 이유리와의 만남",
       "background": "pc_bang_midnight",
+      "text": "카운터로 들어서자 교대자인 유리(Yuri)가 지친 기색이지만 밝게 인사한다.",
       "characters": [
         "Lee Yuri"
       ],
       "dialogue": [
         {
           "speaker": "이유리",
-          "text": "오빠! 오늘 폐기 도시락 '치킨 마요' 나왔어! 전자레인지 돌려왔으니까 같이 먹자!"
+          "text": "오빠! 왔어? 오늘 폐기 도시락 '치킨 마요' 나왔어! 전자레인지 돌려왔으니까 같이 먹자!"
         },
         {
           "speaker": "system",
@@ -270,7 +304,7 @@ STORY_DATA_KR = {
           "text": "3분 12초 늦었어. ...그래도 왔네? 난 네가 런타임 에러 내고 도망갈 줄 알았는데."
         },
         {
-          "speaker": "주인공",
+          "speaker": "진",
           "text": "선배가 부르는데 와야죠. 제적당하면 인생 로그아웃이니까요."
         },
         {
@@ -298,7 +332,7 @@ STORY_DATA_KR = {
           "text": "먹고 해. 당 떨어져서 헛소리 코딩하지 말고. ...너 요즘 밥은 먹고 다니니?"
         },
         {
-          "speaker": "주인공",
+          "speaker": "진",
           "text": "학식 라면으로 때우죠. 선배는 왜 이렇게까지 챙겨주세요? 저 바보라면서요."
         },
         {
@@ -366,7 +400,7 @@ STORY_DATA_KR = {
           "text": "오빠!! 진짜 왔구나! 나 오빠 딜량만 믿고 있었다고 ㅠㅠ 얼른 앞치마 입어! 지금 주문 밀려서 웨이브 10단계야!"
         },
         {
-          "speaker": "주인공",
+          "speaker": "진",
           "text": "상황 브리핑은 나중에. 내가 라면 물 맞출 테니까 넌 아이스티 샷 내려!"
         },
         {
@@ -394,7 +428,7 @@ STORY_DATA_KR = {
           "text": "하아... 힘들다. 오빠 없었으면 나 진짜 탈주했을 거야."
         },
         {
-          "speaker": "주인공",
+          "speaker": "진",
           "text": "근데 넌 알바 왜 이렇게 빡세게 하냐? 굿즈 사려고?"
         },
         {
@@ -460,12 +494,12 @@ STORY_DATA_KR = {
 STORY_DATA_EN = {
   "project_meta": {
     "title": "[EN] Runtime Error: No Exception Handling for Love?",
-    "version": "1.4.0 (Localized Names)",
+    "version": "1.6.0 (Character Name Patch)",
     "genre": "Hyper-Realistic CS Major Romance Sim",
     "author": "Minkyu + Gemini"
   },
   "player_state": {
-    "name": "Protagonist",
+    "name": "Jin",
     "department": "CS Major (Junior Year)",
     "status": {
       "academic": "Academic Probation Risk (Failing 'Algorithms')",
@@ -484,21 +518,46 @@ STORY_DATA_EN = {
       "title": "Prologue: My Life Screen of Death",
       "background": "dark_room_computer_smoke",
       "text": "My life is a 'Segmentation Fault (Core Dumped)'. \n\nI'm about to fail my core Algorithm class, and my only friend, the RTX 5070, died a hero's death running 'Cyberpunk 2077'. \n\nSix months until GTA 6... Surviving on integrated graphics is literal hell.",
+      "next_node": "node_01_5_professor_call"
+    },
+    {
+      "id": "node_01_5_professor_call",
+      "type": "dialogue",
+      "title": "Event: The Professor's Summon",
+      "background": "professor_office",
+      "characters": [
+        "Professor Park"
+      ],
+      "text": "You are summoned to Professor Park's office. The air is cold.",
+      "dialogue": [
+        {
+          "speaker": "Professor Park",
+          "text": "Look at this midterm score. 12 points? Are you mining crypto with your brain instead of studying?"
+        },
+        {
+          "speaker": "Jin",
+          "text": "I... I had some hardware issues..."
+        },
+        {
+          "speaker": "Professor Park",
+          "text": "Excuses. I'm assigning you a mandatory peer mentor. She's the top of the class. If you don't show up to her sessions, you fail. Get to the lab. Now."
+        }
+      ],
       "next_node": "node_02_common_day"
     },
     {
       "id": "node_02_common_day",
       "type": "dialogue",
-      "title": "Common Route (Day): Meeting Sujin",
+      "title": "Common Route (Day): The Mentor",
       "background": "university_lab_room",
-      "text": "Sighing in the corner of the lab, Sujin, the department's top student, glares at my monitor.",
+      "text": "Kicked out of the office, I trudge to the lab. A girl with sharp glasses is tapping her foot, waiting for me.",
       "characters": [
         "Cha Sujin"
       ],
       "dialogue": [
         {
           "speaker": "Sujin",
-          "text": "Did you code this with your toes? Do you want to crash the server with O(n^2) complexity? Get rid of that nested loop right now."
+          "text": "So you're the '12 points' guy? Professor Park told me to fix you. \n...Wait, did you code this with your toes? Get rid of that nested loop right now."
         },
         {
           "speaker": "system",
@@ -554,7 +613,7 @@ STORY_DATA_EN = {
       "affinity_change": {
         "cha_sujin": 15
       },
-      "next_node": "node_03_common_night"
+      "next_node": "node_02_5_work_login"
     },
     {
       "id": "node_02_fail",
@@ -577,20 +636,29 @@ STORY_DATA_EN = {
       "affinity_change": {
         "cha_sujin": -5
       },
+      "next_node": "node_02_5_work_login"
+    },
+    {
+      "id": "node_02_5_work_login",
+      "type": "narrative",
+      "title": "Transition: Login to Reality",
+      "background": "street_night_neon",
+      "text": "School is over, but my day isn't. \n\nTo resurrect my dead GPU (RTX 5070), I need cash. I head to 'Nexus PC Cafe' for the graveyard shift. \n\nThe smell of ramen and the sound of mechanical keyboards... it's time to grind.",
       "next_node": "node_03_common_night"
     },
     {
       "id": "node_03_common_night",
       "type": "dialogue",
-      "title": "Common Route (Night): Yuna's Secret",
+      "title": "Common Route (Night): Yuna's Shift",
       "background": "pc_bang_midnight",
+      "text": "I walk behind the counter. My coworker, Yuna, is already there, looking exhausted but cheerful.",
       "characters": [
         "Lee Yuna"
       ],
       "dialogue": [
         {
           "speaker": "Yuna",
-          "text": "Oppa! We got expired 'Chicken Mayo' bentos today! I heated them up, let's eat!"
+          "text": "Oppa! You're here! We got expired 'Chicken Mayo' bentos today! I heated them up, let's eat!"
         },
         {
           "speaker": "system",
@@ -720,7 +788,7 @@ STORY_DATA_EN = {
           "text": "You're 3 minutes and 12 seconds late. ...But you came? I thought you'd runtime error and flee."
         },
         {
-          "speaker": "Protagonist",
+          "speaker": "Jin",
           "text": "When the senior calls, I answer. Getting expelled is basically logging out of life."
         },
         {
@@ -748,7 +816,7 @@ STORY_DATA_EN = {
           "text": "Eat. Don't write garbage code because of low blood sugar. ...Do you even eat properly these days?"
         },
         {
-          "speaker": "Protagonist",
+          "speaker": "Jin",
           "text": "Just instant ramen. Why do you care so much, Sunbae? You said I was an idiot."
         },
         {
@@ -816,7 +884,7 @@ STORY_DATA_EN = {
           "text": "Oppa!! You really came! I was trusting your DPS ㅠㅠ Put on this apron! We're at Wave 10 of orders!"
         },
         {
-          "speaker": "Protagonist",
+          "speaker": "Jin",
           "text": "Briefing later. I'll handle the ramen water, you pull the iced tea shots!"
         },
         {
@@ -844,7 +912,7 @@ STORY_DATA_EN = {
           "text": "Phew... that was hard. If you weren't here, I would've gone AFK IRL."
         },
         {
-          "speaker": "Protagonist",
+          "speaker": "Jin",
           "text": "Why are you grinding so hard here anyway? Buying merch?"
         },
         {
