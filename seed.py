@@ -980,10 +980,8 @@ STORY_DATA_EN_RAW = {
 
 
 def _patch_choice(node, index, updates):
-    choices = node.get("choices")
-    if not isinstance(choices, list) or index < 0 or index >= len(choices):
-        return
-    choices[index].update(updates)
+    # Dice/choice patching is disabled for now to keep branch flow deterministic.
+    return
 
 
 def _set_next_node(nodes_by_id, node_id, next_node):
@@ -1016,39 +1014,13 @@ def _rename_speaker(nodes, from_name, to_name):
 def _apply_story_refresh(raw_story_data, locale):
     refreshed = deepcopy(raw_story_data)
     meta = refreshed.setdefault("project_meta", {})
-    meta["version"] = "1.8.0 (Expanded Story Beats + Visual Roll Patch)"
+    meta["version"] = "1.8.1 (Expanded Story Beats + No Dice Roll Patch)"
 
     nodes = refreshed.get("story_nodes", [])
     nodes_by_id = {node.get("id"): node for node in nodes if node.get("id")}
 
-    # Add deterministic illustration URLs per node so assets are stable between runs.
-    for node in nodes:
-        node_id = node.get("id")
-        if node_id and not node.get("illustration_url"):
-            node["illustration_url"] = f"https://picsum.photos/seed/{locale}-{node_id}/1280/720"
-
-    # Selective dice checks (not every choice), based on scene tension.
-    _patch_choice(
-        nodes_by_id.get("node_02_mini_event", {}),
-        1,
-        {
-            "target_node": "node_02_success",
-            "requires_roll": True,
-            "roll_sides": 20,
-            "roll_required": 12,
-            "on_fail_target": "node_02_fail",
-        },
-    )
-    _patch_choice(
-        nodes_by_id.get("node_03_mini_event", {}),
-        1,
-        {
-            "requires_roll": True,
-            "roll_sides": 20,
-            "roll_required": 11,
-            "on_fail_target": "node_03_fail",
-        },
-    )
+    # Keep illustration URLs optional.
+    # If a node has no explicit illustration_url, clients should render by scene background.
 
     # Shared route expansion: both locales keep the same node IDs and branch structure.
     _set_next_node(nodes_by_id, "node_02_success", "node_02_aftermath")
@@ -1128,46 +1100,12 @@ def _apply_story_refresh(raw_story_data, locale):
 
         _rename_speaker(nodes, "Jin", "User")
 
-        _patch_choice(
-            nodes_by_id.get("node_02_mini_event", {}),
-            0,
-            {"effect": "Sujin Affection ++ (safe, high-confidence solution)"},
-        )
-        _patch_choice(
-            nodes_by_id.get("node_02_mini_event", {}),
-            1,
-            {
-                "label": "\"I can try a risky cache trick. If luck is on our side, it may run faster.\"",
-                "effect": "Dice Check d20 >= 12. Success: win respect. Fail: immediate scorn.",
-            },
-        )
-        _patch_choice(
-            nodes_by_id.get("node_03_mini_event", {}),
-            1,
-            {
-                "effect": "Dice Check d20 >= 11. Success: calm customer. Fail: scene escalates.",
-            },
-        )
     else:
         mentor_mid_id = "sooyeon_mid_event"
         mentor_final_id = "sooyeon_final_choice"
         partner_mid_id = "yuri_mid_event"
         partner_final_id = "yuri_final_choice"
 
-        _patch_choice(
-            nodes_by_id.get("node_02_mini_event", {}),
-            1,
-            {
-                "effect": "주사위 판정 d20 >= 12. 성공: 수연에게 인정받음. 실패: 바로 잔소리 폭격.",
-            },
-        )
-        _patch_choice(
-            nodes_by_id.get("node_03_mini_event", {}),
-            1,
-            {
-                "effect": "주사위 판정 d20 >= 11. 성공: 상황 진정. 실패: 분위기 악화.",
-            },
-        )
 
     _set_next_node(nodes_by_id, mentor_mid_id, "route_mentor_checkpoint")
     _set_next_node(nodes_by_id, partner_mid_id, "route_partner_checkpoint")
@@ -1223,12 +1161,8 @@ def _apply_story_refresh(raw_story_data, locale):
                     },
                     {
                         "label": "\"Let's attempt a risky optimization challenge and bet on speed.\"",
-                        "target_node": "route_mentor_bridge",
-                        "effect": "Dice Check d20 >= 14. Success: breakthrough. Fail: hotfix scramble.",
-                        "requires_roll": True,
-                        "roll_sides": 20,
-                        "roll_required": 14,
-                        "on_fail_target": "route_mentor_bridge_fail",
+                        "target_node": "route_mentor_bridge_fail",
+                        "effect": "High-risk call. You burn extra time patching gaps, then recover together.",
                     },
                 ],
             },
@@ -1281,12 +1215,8 @@ def _apply_story_refresh(raw_story_data, locale):
                     },
                     {
                         "label": "\"Let's run a flash combo promo to stabilize mood and sales.\"",
-                        "target_node": "route_partner_bridge",
-                        "effect": "Dice Check d20 >= 13. Success: hype wave. Fail: extra cleanup.",
-                        "requires_roll": True,
-                        "roll_sides": 20,
-                        "roll_required": 13,
-                        "on_fail_target": "route_partner_bridge_fail",
+                        "target_node": "route_partner_bridge_fail",
+                        "effect": "Aggressive promo call. Orders spike and cleanup gets harder, but you stabilize together.",
                     },
                 ],
             },
@@ -1372,12 +1302,8 @@ def _apply_story_refresh(raw_story_data, locale):
                     },
                     {
                         "label": "\"고위험 최적화 문제로 한 방 노려보자.\"",
-                        "target_node": "route_mentor_bridge",
-                        "effect": "주사위 판정 d20 >= 14. 성공: 대박 풀이. 실패: 야간 핫픽스.",
-                        "requires_roll": True,
-                        "roll_sides": 20,
-                        "roll_required": 14,
-                        "on_fail_target": "route_mentor_bridge_fail",
+                        "target_node": "route_mentor_bridge_fail",
+                        "effect": "주사위 판정 High-risk branch. 성공: 대박 풀이. 실패: 야간 핫픽스.",
                     },
                 ],
             },
@@ -1430,12 +1356,8 @@ def _apply_story_refresh(raw_story_data, locale):
                     },
                     {
                         "label": "\"분위기 반전용 번개 프로모션 간다.\"",
-                        "target_node": "route_partner_bridge",
-                        "effect": "주사위 판정 d20 >= 13. 성공: 분위기 반등. 실패: 추가 정리 지옥.",
-                        "requires_roll": True,
-                        "roll_sides": 20,
-                        "roll_required": 13,
-                        "on_fail_target": "route_partner_bridge_fail",
+                        "target_node": "route_partner_bridge_fail",
+                        "effect": "주사위 판정 High-risk branch. 성공: 분위기 반등. 실패: 추가 정리 지옥.",
                     },
                 ],
             },
@@ -1503,18 +1425,6 @@ def _normalize_choices(node_data, default_continue_text):
                 "next_page_id": str(next_page_id),
                 "effect": choice_data.get("effect"),
             }
-            requires_roll = bool(choice_data.get("requires_roll"))
-            if requires_roll:
-                normalized_choice["requires_roll"] = True
-                normalized_choice["roll_sides"] = int(choice_data.get("roll_sides") or 20)
-                normalized_choice["roll_required"] = int(choice_data.get("roll_required") or 1)
-                on_fail_target = (
-                    choice_data.get("on_fail_target")
-                    or choice_data.get("on_fail_target_node_custom_id")
-                    or choice_data.get("on_fail_target_node")
-                )
-                if on_fail_target:
-                    normalized_choice["on_fail_target"] = str(on_fail_target)
             normalized.append(normalized_choice)
         return normalized
 
@@ -1623,10 +1533,6 @@ def seed_story(story_data):
                 node_id=parent_node.id,
                 target_node_custom_id=choice_data["next_page_id"],
                 effect_description=choice_data.get("effect"),
-                requires_roll=bool(choice_data.get("requires_roll")),
-                roll_sides=choice_data.get("roll_sides"),
-                roll_required=choice_data.get("roll_required"),
-                on_fail_target_node_custom_id=choice_data.get("on_fail_target"),
             )
             db.session.add(choice)
 
