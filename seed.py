@@ -986,14 +986,37 @@ def _patch_choice(node, index, updates):
     choices[index].update(updates)
 
 
+def _set_next_node(nodes_by_id, node_id, next_node):
+    node = nodes_by_id.get(node_id)
+    if not node:
+        return
+    node["next_node"] = next_node
+    node.pop("next_page_id", None)
+
+
+def _append_node_if_missing(nodes, nodes_by_id, node_payload):
+    node_id = node_payload.get("id")
+    if not node_id or node_id in nodes_by_id:
+        return
+    nodes.append(node_payload)
+    nodes_by_id[node_id] = node_payload
+
+
+def _rename_speaker(nodes, from_name, to_name):
+    for node in nodes:
+        for key in ("dialogue", "content"):
+            entries = node.get(key)
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if isinstance(entry, dict) and entry.get("speaker") == from_name:
+                    entry["speaker"] = to_name
+
+
 def _apply_story_refresh(raw_story_data, locale):
     refreshed = deepcopy(raw_story_data)
     meta = refreshed.setdefault("project_meta", {})
-
-    if locale == "en":
-        meta["version"] = "1.7.0 (Story UX + Visual Roll Patch)"
-    else:
-        meta["version"] = "1.7.0 (Story UX + Visual Roll Patch)"
+    meta["version"] = "1.8.0 (Expanded Story Beats + Visual Roll Patch)"
 
     nodes = refreshed.get("story_nodes", [])
     nodes_by_id = {node.get("id"): node for node in nodes if node.get("id")}
@@ -1027,7 +1050,18 @@ def _apply_story_refresh(raw_story_data, locale):
         },
     )
 
+    # Shared route expansion: both locales keep the same node IDs and branch structure.
+    _set_next_node(nodes_by_id, "node_02_success", "node_02_aftermath")
+    _set_next_node(nodes_by_id, "node_02_fail", "node_02_aftermath")
+    _set_next_node(nodes_by_id, "node_03_success", "node_03_aftermath")
+    _set_next_node(nodes_by_id, "node_03_fail", "node_03_aftermath")
+
     if locale == "en":
+        mentor_mid_id = "sujin_mid_event"
+        mentor_final_id = "sujin_final_choice"
+        partner_mid_id = "yuna_mid_event"
+        partner_final_id = "yuna_final_choice"
+
         text_updates = {
             "node_01_prologue": (
                 "My life is one giant Segmentation Fault.\n\n"
@@ -1092,6 +1126,8 @@ def _apply_story_refresh(raw_story_data, locale):
             if node:
                 node["text"] = text
 
+        _rename_speaker(nodes, "Jin", "User")
+
         _patch_choice(
             nodes_by_id.get("node_02_mini_event", {}),
             0,
@@ -1110,6 +1146,329 @@ def _apply_story_refresh(raw_story_data, locale):
             1,
             {
                 "effect": "Dice Check d20 >= 11. Success: calm customer. Fail: scene escalates.",
+            },
+        )
+    else:
+        mentor_mid_id = "sooyeon_mid_event"
+        mentor_final_id = "sooyeon_final_choice"
+        partner_mid_id = "yuri_mid_event"
+        partner_final_id = "yuri_final_choice"
+
+        _patch_choice(
+            nodes_by_id.get("node_02_mini_event", {}),
+            1,
+            {
+                "effect": "주사위 판정 d20 >= 12. 성공: 수연에게 인정받음. 실패: 바로 잔소리 폭격.",
+            },
+        )
+        _patch_choice(
+            nodes_by_id.get("node_03_mini_event", {}),
+            1,
+            {
+                "effect": "주사위 판정 d20 >= 11. 성공: 상황 진정. 실패: 분위기 악화.",
+            },
+        )
+
+    _set_next_node(nodes_by_id, mentor_mid_id, "route_mentor_checkpoint")
+    _set_next_node(nodes_by_id, partner_mid_id, "route_partner_checkpoint")
+
+    if locale == "en":
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "node_02_aftermath",
+                "type": "narrative",
+                "title": "Aftermath: Local Optimization",
+                "background": "campus_walk_evening",
+                "text": (
+                    "After the daytime clash, you and Sujin rerun the benchmarks one last time. "
+                    "The code finally stops stuttering.\n\n"
+                    "You don't become friends instantly, but the cold sarcasm drops by one degree."
+                ),
+                "next_node": "node_02_5_work_login",
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "node_03_aftermath",
+                "type": "dialogue",
+                "title": "Aftermath: Closing Shift Debrief",
+                "background": "pc_bang_cleanup",
+                "characters": ["Lee Yuna"],
+                "dialogue": [
+                    {"speaker": "system", "text": "The rush ends. You stack trays and wipe keyboards side by side."},
+                    {"speaker": "Yuna", "text": "That was intense... but with you here, I didn't panic."},
+                    {"speaker": "User", "text": "Teamplay beats solo carry. Let's survive one shift at a time."},
+                ],
+                "next_node": "node_03_5_weekend_anxiety",
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "route_mentor_checkpoint",
+                "type": "choice",
+                "title": "Mentor Route: Trust Test",
+                "background": "study_room_dawn",
+                "text": "Final prep window: two hours. Sujin asks how you want to spend it.",
+                "choices": [
+                    {
+                        "label": "\"Run the standard checklist. No surprises, no panic.\"",
+                        "target_node": "route_mentor_bridge",
+                        "effect": "Steady confidence and cleaner fundamentals.",
+                    },
+                    {
+                        "label": "\"Let's attempt a risky optimization challenge and bet on speed.\"",
+                        "target_node": "route_mentor_bridge",
+                        "effect": "Dice Check d20 >= 14. Success: breakthrough. Fail: hotfix scramble.",
+                        "requires_roll": True,
+                        "roll_sides": 20,
+                        "roll_required": 14,
+                        "on_fail_target": "route_mentor_bridge_fail",
+                    },
+                ],
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "route_mentor_bridge",
+                "type": "dialogue",
+                "title": "Mentor Route: Clean Build",
+                "background": "university_campus_morning",
+                "characters": ["Cha Sujin"],
+                "dialogue": [
+                    {"speaker": "Sujin", "text": "Good call. Your logic is stable, and that's what wins finals."},
+                    {"speaker": "User", "text": "I finally stopped brute-forcing everything. Mostly."},
+                ],
+                "next_node": mentor_final_id,
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "route_mentor_bridge_fail",
+                "type": "narrative",
+                "title": "Mentor Route: Hotfix Night",
+                "background": "study_room_night",
+                "text": (
+                    "The gamble crashes hard. You and Sujin spend an extra hour patching logic holes.\n\n"
+                    "It's messy, but you finish together and walk into finals with bruised confidence and real trust."
+                ),
+                "next_node": mentor_final_id,
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "route_partner_checkpoint",
+                "type": "choice",
+                "title": "Partner Route: Queue Management",
+                "background": "pc_bang_counter",
+                "text": "Another customer wave hits. Yuna looks at you for the call.",
+                "choices": [
+                    {
+                        "label": "\"We split lanes: I handle ramen, you run orders and payments.\"",
+                        "target_node": "route_partner_bridge",
+                        "effect": "Safe macro play. Stable service quality.",
+                    },
+                    {
+                        "label": "\"Let's run a flash combo promo to stabilize mood and sales.\"",
+                        "target_node": "route_partner_bridge",
+                        "effect": "Dice Check d20 >= 13. Success: hype wave. Fail: extra cleanup.",
+                        "requires_roll": True,
+                        "roll_sides": 20,
+                        "roll_required": 13,
+                        "on_fail_target": "route_partner_bridge_fail",
+                    },
+                ],
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "route_partner_bridge",
+                "type": "dialogue",
+                "title": "Partner Route: Combo Play",
+                "background": "pc_bang_dawn",
+                "characters": ["Lee Yuna"],
+                "dialogue": [
+                    {"speaker": "Yuna", "text": "Nice call! That flow was smooth. We actually controlled the chaos."},
+                    {"speaker": "User", "text": "Shot-calling is easier when your support never tilts."},
+                ],
+                "next_node": partner_final_id,
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "route_partner_bridge_fail",
+                "type": "narrative",
+                "title": "Partner Route: Overtime Recovery",
+                "background": "pc_bang_storage",
+                "text": (
+                    "The promo backfires and orders pile up. You two run overtime to recover the floor.\n\n"
+                    "Exhausted, you still finish as a team, laughing at the disaster on the way out."
+                ),
+                "next_node": partner_final_id,
+            },
+        )
+    else:
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "node_02_aftermath",
+                "type": "narrative",
+                "title": "후일담 : 로컬 최적화",
+                "background": "campus_walk_evening",
+                "text": (
+                    "낮의 소동 이후, 너와 수연은 마지막 벤치마크를 다시 돌렸다.\n\n"
+                    "코드는 드디어 버벅임을 멈췄고, 수연의 말투도 아주 조금 부드러워졌다."
+                ),
+                "next_node": "node_02_5_work_login",
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "node_03_aftermath",
+                "type": "dialogue",
+                "title": "후일담 : 마감 정리",
+                "background": "pc_bang_cleanup",
+                "characters": ["Lee Yuri"],
+                "dialogue": [
+                    {"speaker": "system", "text": "손님이 빠지고 나서, 둘은 나란히 키보드와 테이블을 정리했다."},
+                    {"speaker": "이유리", "text": "오늘 진짜 살았다... 오빠 있어서 안 무서웠어."},
+                    {"speaker": "진", "text": "솔로 캐리보다 듀오 호흡이 더 세지. 다음 웨이브도 버텨보자."},
+                ],
+                "next_node": "node_03_5_weekend_anxiety",
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "route_mentor_checkpoint",
+                "type": "choice",
+                "title": "수연 루트 : 신뢰도 테스트",
+                "background": "study_room_dawn",
+                "text": "시험 전 마지막 2시간. 수연이 준비 전략을 고르라고 한다.",
+                "choices": [
+                    {
+                        "label": "\"기본 체크리스트부터. 안정적으로 가자.\"",
+                        "target_node": "route_mentor_bridge",
+                        "effect": "기초가 단단해지고 멘탈도 안정됨.",
+                    },
+                    {
+                        "label": "\"고위험 최적화 문제로 한 방 노려보자.\"",
+                        "target_node": "route_mentor_bridge",
+                        "effect": "주사위 판정 d20 >= 14. 성공: 대박 풀이. 실패: 야간 핫픽스.",
+                        "requires_roll": True,
+                        "roll_sides": 20,
+                        "roll_required": 14,
+                        "on_fail_target": "route_mentor_bridge_fail",
+                    },
+                ],
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "route_mentor_bridge",
+                "type": "dialogue",
+                "title": "수연 루트 : 클린 빌드",
+                "background": "university_campus_morning",
+                "characters": ["Cha Sooyeon"],
+                "dialogue": [
+                    {"speaker": "차수연", "text": "좋아. 오늘은 코드도 사고도 안정적이네. 이 감각 그대로 가."},
+                    {"speaker": "진", "text": "무작정 박치기부터 하던 습관, 드디어 좀 고쳤어요."},
+                ],
+                "next_node": mentor_final_id,
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "route_mentor_bridge_fail",
+                "type": "narrative",
+                "title": "수연 루트 : 핫픽스의 밤",
+                "background": "study_room_night",
+                "text": (
+                    "무리한 시도가 크게 터졌다. 둘은 추가로 한 시간을 붙잡고 버그를 뜯어냈다.\n\n"
+                    "지쳤지만, 끝까지 함께 버텨낸 덕분에 시험장으로 가는 발걸음은 오히려 단단했다."
+                ),
+                "next_node": mentor_final_id,
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "route_partner_checkpoint",
+                "type": "choice",
+                "title": "유리 루트 : 운영 콜",
+                "background": "pc_bang_counter",
+                "text": "손님 웨이브가 다시 몰려온다. 유리가 너를 본다. 어떤 콜을 할까?",
+                "choices": [
+                    {
+                        "label": "\"라인 분담하자. 나는 라면, 넌 주문/결제.\"",
+                        "target_node": "route_partner_bridge",
+                        "effect": "안정적인 운영, 큰 변수 없음.",
+                    },
+                    {
+                        "label": "\"분위기 반전용 번개 프로모션 간다.\"",
+                        "target_node": "route_partner_bridge",
+                        "effect": "주사위 판정 d20 >= 13. 성공: 분위기 반등. 실패: 추가 정리 지옥.",
+                        "requires_roll": True,
+                        "roll_sides": 20,
+                        "roll_required": 13,
+                        "on_fail_target": "route_partner_bridge_fail",
+                    },
+                ],
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "route_partner_bridge",
+                "type": "dialogue",
+                "title": "유리 루트 : 콤보 플레이",
+                "background": "pc_bang_dawn",
+                "characters": ["Lee Yuri"],
+                "dialogue": [
+                    {"speaker": "이유리", "text": "방금 콜 미쳤다! 진짜 듀오 랭크 올리는 느낌이야."},
+                    {"speaker": "진", "text": "너처럼 멘탈 안 터지는 서포터 있으면 콜하기 편하지."},
+                ],
+                "next_node": partner_final_id,
+            },
+        )
+        _append_node_if_missing(
+            nodes,
+            nodes_by_id,
+            {
+                "id": "route_partner_bridge_fail",
+                "type": "narrative",
+                "title": "유리 루트 : 연장전 복구",
+                "background": "pc_bang_storage",
+                "text": (
+                    "프로모션이 예상보다 크게 터지며 주문이 폭주했다. 둘은 연장 근무로 겨우 수습했다.\n\n"
+                    "녹초가 됐지만, 나가면서 서로 웃었다. 오늘 멘붕도 함께 넘겼으니까."
+                ),
+                "next_node": partner_final_id,
             },
         )
 
