@@ -37,6 +37,7 @@ class StoryNode(db.Model):
     custom_id = db.Column(db.String(50), index=True)
     node_type = db.Column(db.String(20), default="dialogue")
     background = db.Column(db.String(100))
+    illustration_url = db.Column(db.String(500), nullable=True)
     content_data = db.Column(db.JSON, default=list)
     affinity_change = db.Column(db.JSON, default=dict)
     is_ending = db.Column(db.Boolean, default=False)
@@ -62,6 +63,7 @@ class StoryNode(db.Model):
             "title": self.custom_id,
             "type": self.node_type,
             "background": self.background,
+            "illustration_url": self.illustration_url,
             "content": self.content_data,
             "text": text,
             "affinity_change": self.affinity_change,

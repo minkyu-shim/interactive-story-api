@@ -35,6 +35,17 @@ def _normalize_content(data, fallback=None):
     return fallback if fallback is not None else []
 
 
+def _normalize_illustration_url(value):
+    if value is None:
+        return None, None
+    value = str(value).strip()
+    if not value:
+        return None, None
+    if value.startswith(("http://", "https://", "/static/")):
+        return value, None
+    return None, "illustration_url must start with http://, https://, or /static/."
+
+
 def _resolve_choice_payload(data):
     text = data.get("text") or data.get("label")
     target = data.get("next_page_id") or data.get("target_node")
@@ -107,6 +118,11 @@ def _apply_node_updates(node, data):
         node.node_type = data.get("type")
     if "background" in data:
         node.background = data.get("background")
+    if "illustration_url" in data:
+        illustration_url, err = _normalize_illustration_url(data.get("illustration_url"))
+        if err:
+            raise ValueError(err)
+        node.illustration_url = illustration_url
     if "affinity_change" in data:
         node.affinity_change = data.get("affinity_change") or {}
     if any(key in data for key in ("content", "dialogue", "text")):
@@ -195,6 +211,9 @@ class StoryNodeListAPI(MethodView):
     def post(self, story_id):
         story = Story.query.get_or_404(story_id)
         data = _json_payload()
+        illustration_url, err = _normalize_illustration_url(data.get("illustration_url"))
+        if err:
+            return jsonify({"error": err}), 400
 
         custom_id = data.get("custom_id") or data.get("id")
         if not custom_id:
@@ -213,6 +232,7 @@ class StoryNodeListAPI(MethodView):
             custom_id=custom_id,
             node_type=node_type,
             background=data.get("background"),
+            illustration_url=illustration_url,
             content_data=_normalize_content(data, fallback=[]),
             affinity_change=data.get("affinity_change", {}),
             is_ending=bool(data.get("is_ending") or node_type == "ending"),
@@ -231,7 +251,10 @@ class StoryNodeDetailAPI(MethodView):
     def put(self, story_id, custom_id):
         node = StoryNode.query.filter_by(story_id=story_id, custom_id=custom_id).first_or_404()
         data = _json_payload()
-        _apply_node_updates(node, data)
+        try:
+            _apply_node_updates(node, data)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         db.session.commit()
         return jsonify(node.to_dict())
 
@@ -250,7 +273,10 @@ class NodeAliasDetailAPI(MethodView):
     def put(self, custom_id):
         node = _get_node_by_custom_id_or_404(custom_id)
         data = _json_payload()
-        _apply_node_updates(node, data)
+        try:
+            _apply_node_updates(node, data)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         db.session.commit()
         return jsonify(node.to_dict())
 
@@ -380,11 +406,15 @@ class StoryImportAPI(MethodView):
 
         nodes_data = data.get("story_nodes", [])
         for node_data in nodes_data:
+            illustration_url, err = _normalize_illustration_url(node_data.get("illustration_url"))
+            if err:
+                return jsonify({"error": f"Invalid illustration URL in node {node_data.get('custom_id') or node_data.get('id')}"}), 400
             node = StoryNode(
                 story_id=new_story.id,
                 custom_id=node_data.get("custom_id") or node_data.get("id"),
                 node_type=node_data.get("type", "dialogue"),
                 background=node_data.get("background"),
+                illustration_url=illustration_url,
                 content_data=_normalize_content(node_data, fallback=[]),
                 affinity_change=node_data.get("affinity_change", {}),
                 is_ending=bool(node_data.get("is_ending") or node_data.get("type") == "ending"),
