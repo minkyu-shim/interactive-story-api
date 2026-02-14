@@ -1,4 +1,3 @@
-import json
 from app import create_app, db
 from app.models import Story, StoryNode, Choice
 
@@ -7,7 +6,7 @@ app = create_app()
 # ==========================================
 # 1. KOREAN DATA (Expanded Version)
 # ==========================================
-STORY_DATA_KR = {
+STORY_DATA_KR_RAW = {
   "project_meta": {
     "title": "[KR] 런타임 에러 : 연애는 예외처리가 안 되나요?",
     "version": "1.6.0 (Narrative Flow Patch)",
@@ -15,7 +14,7 @@ STORY_DATA_KR = {
     "author": "Minkyu + Gemini"
   },
   "player_state": {
-    "name": "진",
+    "name": "user",
     "department": "컴퓨터공학과 3학년",
     "status": {
       "academic": "학사 경고 (전필 '알고리즘' F 위기)",
@@ -278,12 +277,12 @@ STORY_DATA_KR = {
       "text": "당신의 우선순위 큐(Priority Queue)에 넣을 작업은?",
       "choices": [
         {
-          "label": "차수연에게 간다 (학점 구제 & 지적인 사랑)",
+          "label": "차수연에게 간다",
           "target_node": "root_sooyeon_start",
           "effect": "학업 성취도 상승, RTX 5070 포기"
         },
         {
-          "label": "이유리에게 간다 (자금 확보 & 덕질 메이트)",
+          "label": "이유리에게 간다",
           "target_node": "root_yuri_start",
           "effect": "RTX 5070 자금 확보, 학사 경고 위험 감수"
         }
@@ -491,7 +490,7 @@ STORY_DATA_KR = {
 # ==========================================
 # 2. ENGLISH DATA (Translated Version)
 # ==========================================
-STORY_DATA_EN = {
+STORY_DATA_EN_RAW = {
   "project_meta": {
     "title": "[EN] Runtime Error: No Exception Handling for Love?",
     "version": "1.6.0 (Character Name Patch)",
@@ -499,7 +498,7 @@ STORY_DATA_EN = {
     "author": "Minkyu + Gemini"
   },
   "player_state": {
-    "name": "Jin",
+    "name": "user",
     "department": "CS Major (Junior Year)",
     "status": {
       "academic": "Academic Probation Risk (Failing 'Algorithms')",
@@ -762,12 +761,12 @@ STORY_DATA_EN = {
       "text": "What goes into your Priority Queue?",
       "choices": [
         {
-          "label": "Go to Sujin (Save GPA & Intellectual Love)",
+          "label": "Go to Sujin",
           "target_node": "root_sujin_start",
           "effect": "Academics UP, Give up RTX 5070"
         },
         {
-          "label": "Go to Yuna (Secure Funds & Otaku Mate)",
+          "label": "Go to Yuna",
           "target_node": "root_yuna_start",
           "effect": "Secure RTX 5070 Fund, Risk Academic Probation"
         }
@@ -977,92 +976,155 @@ STORY_DATA_EN = {
 # 3. HELPER FUNCTION
 # ==========================================
 
-def seed_story(story_data, default_continue_text="Continue"):
-    """
-  Parses a Story Data Dictionary and inserts it into the DB.
-  """
-    meta = story_data['project_meta']
-    print(f"--> Processing Story: {meta['title']}...")
 
-    # A. Create Story Entry
+def _normalize_content(node_data):
+    if isinstance(node_data.get("content"), list):
+        return node_data.get("content")
+    if isinstance(node_data.get("dialogue"), list):
+        return node_data.get("dialogue")
+    if node_data.get("text"):
+        return [{"speaker": "System", "text": node_data.get("text", "")}]
+    return []
+
+
+def _normalize_choices(node_data, default_continue_text):
+    normalized = []
+
+    if isinstance(node_data.get("choices"), list):
+        for choice_data in node_data["choices"]:
+            text = choice_data.get("text") or choice_data.get("label")
+            next_page_id = choice_data.get("next_page_id") or choice_data.get("target_node")
+            if not text or not next_page_id:
+                continue
+            normalized.append({
+                "text": text,
+                "next_page_id": str(next_page_id),
+                "effect": choice_data.get("effect"),
+            })
+        return normalized
+
+    next_node = node_data.get("next_page_id") or node_data.get("next_node")
+    if next_node and next_node != "TBD":
+        normalized.append({
+            "text": default_continue_text,
+            "next_page_id": str(next_node),
+        })
+
+    return normalized
+
+
+def normalize_story_for_django(raw_story_data, default_continue_text="Continue"):
+    story_meta = dict(raw_story_data.get("project_meta", {}))
+    story_meta.setdefault("status", "published")
+
+    initial_state = dict(raw_story_data.get("initial_state") or raw_story_data.get("player_state") or {})
+    # Requested rename: protagonist name should be "user".
+    initial_state["name"] = "user"
+
+    normalized_nodes = []
+    for node_data in raw_story_data.get("story_nodes", []):
+        custom_id = node_data.get("custom_id") or node_data.get("id")
+        if not custom_id:
+            continue
+
+        node_type = node_data.get("type", "narrative")
+        is_ending = bool(node_data.get("is_ending") or node_data.get("is_game_over") or node_type == "ending")
+        ending_label = node_data.get("ending_label") or node_data.get("outcome")
+        if is_ending and not ending_label:
+            ending_label = node_data.get("title")
+
+        normalized_nodes.append({
+            "custom_id": str(custom_id),
+            "type": node_type,
+            "title": node_data.get("title"),
+            "background": node_data.get("background"),
+            "content": _normalize_content(node_data),
+            "text": node_data.get("text"),
+            "affinity_change": node_data.get("affinity_change", {}),
+            "is_ending": is_ending,
+            "ending_label": ending_label,
+            "choices": _normalize_choices(node_data, default_continue_text),
+        })
+
+    return {
+        "project_meta": story_meta,
+        "initial_state": initial_state,
+        "story_nodes": normalized_nodes,
+    }
+
+
+STORY_DATA_KR = normalize_story_for_django(STORY_DATA_KR_RAW, default_continue_text="계속하기")
+STORY_DATA_EN = normalize_story_for_django(STORY_DATA_EN_RAW, default_continue_text="Continue")
+
+
+def seed_story(story_data):
+    """
+    Parses a Django-compatible Story Data Dictionary and inserts it into the DB.
+    """
+    meta = story_data["project_meta"]
+    story_title = meta.get("title", "Untitled")
+    print("--> Processing story...")
+
     story = Story(
-        title=meta['title'],
-        description=f"Version {meta['version']}",
-        genre=meta['genre'],
-        author=meta['author'],
-        initial_state=story_data['player_state']
+        title=story_title,
+        description=f"Version {meta.get('version', 'N/A')}",
+        genre=meta.get("genre"),
+        author=meta.get("author"),
+        initial_state=story_data.get("initial_state", {}),
+        status=meta.get("status", "published"),
     )
     db.session.add(story)
-    db.session.commit()  # Commit to get story.id
+    db.session.commit()
 
-    nodes_data = story_data['story_nodes']
+    nodes_data = story_data.get("story_nodes", [])
 
-    # B. Create Nodes
-    for n_data in nodes_data:
-        # Normalize Content
-        content = []
-        if 'dialogue' in n_data:
-            content = n_data['dialogue']
-        elif 'text' in n_data:
-            content = [{"speaker": "System", "text": n_data['text']}]
-
+    for node_data in nodes_data:
         node = StoryNode(
             story_id=story.id,
-            custom_id=n_data['id'],
-            node_type=n_data.get('type', 'narrative'),
-            background=n_data.get('background'),
-            content_data=content,
-            affinity_change=n_data.get('affinity_change', {}),
-            is_ending=n_data.get('is_ending', False),
-            ending_outcome=n_data.get('outcome')
+            custom_id=node_data["custom_id"],
+            node_type=node_data.get("type", "narrative"),
+            background=node_data.get("background"),
+            content_data=node_data.get("content", []),
+            affinity_change=node_data.get("affinity_change", {}),
+            is_ending=node_data.get("is_ending", False),
+            ending_outcome=node_data.get("ending_label"),
         )
         db.session.add(node)
 
     db.session.commit()
 
-    # C. Create Choices/Links
-    for n_data in nodes_data:
-        parent_node = StoryNode.query.filter_by(story_id=story.id, custom_id=n_data['id']).first()
+    for node_data in nodes_data:
+        parent_node = StoryNode.query.filter_by(story_id=story.id, custom_id=node_data["custom_id"]).first()
+        if not parent_node:
+            continue
 
-        # Explicit Choices
-        if 'choices' in n_data:
-            for c_data in n_data['choices']:
-                choice = Choice(
-                    text=c_data['label'],
-                    node_id=parent_node.id,
-                    target_node_custom_id=c_data['target_node'],
-                    effect_description=c_data.get('effect')
-                )
-                db.session.add(choice)
-
-        # Implicit Linear Link
-        elif 'next_node' in n_data and n_data['next_node'] != "TBD":
+        for choice_data in node_data.get("choices", []):
+            if not choice_data.get("text") or not choice_data.get("next_page_id"):
+                continue
             choice = Choice(
-                text=default_continue_text,
+                text=choice_data["text"],
                 node_id=parent_node.id,
-                target_node_custom_id=n_data['next_node']
+                target_node_custom_id=choice_data["next_page_id"],
+                effect_description=choice_data.get("effect"),
             )
             db.session.add(choice)
 
     db.session.commit()
-    print(f"✅ Successfully seeded: {meta['title']}")
+    print("Successfully seeded story.")
 
 
 # ==========================================
 # 4. MAIN EXECUTION
 # ==========================================
 
-with app.app_context():
-    print("🌱 Starting Database Seed...")
+if __name__ == "__main__":
+    with app.app_context():
+        print("Starting database seed...")
 
-    # Reset DB
-    db.drop_all()
-    db.create_all()
+        db.drop_all()
+        db.create_all()
 
-    # Seed Korean Version
-    seed_story(STORY_DATA_KR, default_continue_text="계속하기")
+        seed_story(STORY_DATA_KR)
+        seed_story(STORY_DATA_EN)
 
-    # Seed English Version
-    seed_story(STORY_DATA_EN, default_continue_text="Continue")
-
-    print("🚀 All stories seeded! Ready to play.")
+        print("All stories seeded. Ready to play.")
