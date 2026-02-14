@@ -81,6 +81,10 @@ class Choice(db.Model):
     node_id = db.Column(db.Integer, db.ForeignKey("story_node.id"), nullable=False)
     target_node_custom_id = db.Column(db.String(50), nullable=True)
     effect_description = db.Column(db.String(100))
+    requires_roll = db.Column(db.Boolean, nullable=False, default=False)
+    roll_sides = db.Column(db.Integer, nullable=True)
+    roll_required = db.Column(db.Integer, nullable=True)
+    on_fail_target_node_custom_id = db.Column(db.String(50), nullable=True)
 
     def to_dict(self):
         return {
@@ -90,4 +94,8 @@ class Choice(db.Model):
             "label": self.text,
             "target_node": self.target_node_custom_id,
             "effect": self.effect_description,
+            "requires_roll": bool(self.requires_roll),
+            "roll_sides": self.roll_sides,
+            "roll_required": self.roll_required,
+            "on_fail_target": self.on_fail_target_node_custom_id,
         }

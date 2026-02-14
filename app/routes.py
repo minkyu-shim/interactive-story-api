@@ -42,6 +42,37 @@ def _resolve_choice_payload(data):
     return text, target, effect
 
 
+def _to_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return False
+
+
+def _to_int(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _resolve_choice_roll_payload(data):
+    requires_roll = _to_bool(data.get("requires_roll"))
+    if not requires_roll:
+        return False, None, None, None
+
+    roll_sides = _to_int(data.get("roll_sides"), 6)
+    roll_sides = min(max(roll_sides, 2), 100)
+    roll_required = _to_int(data.get("roll_required"), max(1, (roll_sides + 1) // 2))
+    roll_required = min(max(roll_required, 1), roll_sides)
+    on_fail_target = data.get("on_fail_target") or data.get("on_fail_target_node")
+    on_fail_target = str(on_fail_target) if on_fail_target else None
+    return True, roll_sides, roll_required, on_fail_target
+
+
 def _resolve_story_id_from_request_payload():
     story_id = request.args.get("story_id", type=int)
     if story_id is not None:
@@ -251,6 +282,7 @@ class ChoiceCreationAPI(MethodView):
         parent_node = StoryNode.query.filter_by(story_id=story_id, custom_id=node_custom_id).first_or_404()
         data = _json_payload()
         text, target, effect = _resolve_choice_payload(data)
+        requires_roll, roll_sides, roll_required, on_fail_target = _resolve_choice_roll_payload(data)
         if not text or not target:
             return jsonify({"error": "Choice requires text/label and next_page_id/target_node."}), 400
 
@@ -259,6 +291,10 @@ class ChoiceCreationAPI(MethodView):
             node_id=parent_node.id,
             target_node_custom_id=target,
             effect_description=effect,
+            requires_roll=requires_roll,
+            roll_sides=roll_sides,
+            roll_required=roll_required,
+            on_fail_target_node_custom_id=on_fail_target,
         )
         db.session.add(choice)
         db.session.commit()
@@ -270,6 +306,7 @@ class ChoiceCreationAliasAPI(MethodView):
         parent_node = _get_node_by_custom_id_or_404(node_custom_id)
         data = _json_payload()
         text, target, effect = _resolve_choice_payload(data)
+        requires_roll, roll_sides, roll_required, on_fail_target = _resolve_choice_roll_payload(data)
         if not text or not target:
             return jsonify({"error": "Choice requires text/label and next_page_id/target_node."}), 400
 
@@ -278,6 +315,10 @@ class ChoiceCreationAliasAPI(MethodView):
             node_id=parent_node.id,
             target_node_custom_id=target,
             effect_description=effect,
+            requires_roll=requires_roll,
+            roll_sides=roll_sides,
+            roll_required=roll_required,
+            on_fail_target_node_custom_id=on_fail_target,
         )
         db.session.add(choice)
         db.session.commit()
@@ -299,6 +340,15 @@ class ChoiceDetailAPI(MethodView):
             choice.target_node_custom_id = target
         if "effect" in data:
             choice.effect_description = effect
+        if any(key in data for key in ("requires_roll", "roll_sides", "roll_required", "on_fail_target", "on_fail_target_node")):
+            roll_payload = dict(data)
+            if "requires_roll" not in roll_payload and choice.requires_roll:
+                roll_payload["requires_roll"] = True
+            requires_roll, roll_sides, roll_required, on_fail_target = _resolve_choice_roll_payload(roll_payload)
+            choice.requires_roll = requires_roll
+            choice.roll_sides = roll_sides
+            choice.roll_required = roll_required
+            choice.on_fail_target_node_custom_id = on_fail_target
 
         db.session.commit()
         return jsonify(choice.to_dict())
@@ -353,6 +403,7 @@ class StoryImportAPI(MethodView):
 
             for choice_data in node_data.get("choices", []):
                 text, target, effect = _resolve_choice_payload(choice_data)
+                requires_roll, roll_sides, roll_required, on_fail_target = _resolve_choice_roll_payload(choice_data)
                 if not text or not target:
                     continue
                 choice = Choice(
@@ -360,6 +411,10 @@ class StoryImportAPI(MethodView):
                     node_id=parent_node.id,
                     target_node_custom_id=target,
                     effect_description=effect,
+                    requires_roll=requires_roll,
+                    roll_sides=roll_sides,
+                    roll_required=roll_required,
+                    on_fail_target_node_custom_id=on_fail_target,
                 )
                 db.session.add(choice)
 
