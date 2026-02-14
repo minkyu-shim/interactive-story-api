@@ -979,10 +979,6 @@ STORY_DATA_EN_RAW = {
 # ==========================================
 
 
-def _patch_choice(node, index, updates):
-    # Dice/choice patching is disabled for now to keep branch flow deterministic.
-    return
-
 
 def _set_next_node(nodes_by_id, node_id, next_node):
     node = nodes_by_id.get(node_id)
@@ -1014,7 +1010,7 @@ def _rename_speaker(nodes, from_name, to_name):
 def _apply_story_refresh(raw_story_data, locale):
     refreshed = deepcopy(raw_story_data)
     meta = refreshed.setdefault("project_meta", {})
-    meta["version"] = "1.8.1 (Expanded Story Beats + No Dice Roll Patch)"
+    meta["version"] = "1.8.2 (Expanded Story Beats + Deterministic Branch Patch)"
 
     nodes = refreshed.get("story_nodes", [])
     nodes_by_id = {node.get("id"): node for node in nodes if node.get("id")}
@@ -1303,7 +1299,7 @@ def _apply_story_refresh(raw_story_data, locale):
                     {
                         "label": "\"고위험 최적화 문제로 한 방 노려보자.\"",
                         "target_node": "route_mentor_bridge_fail",
-                        "effect": "주사위 판정 High-risk branch. 성공: 대박 풀이. 실패: 야간 핫픽스.",
+                        "effect": "고위험 분기. 성공: 대박 풀이. 실패: 야간 핫픽스.",
                     },
                 ],
             },
@@ -1357,7 +1353,7 @@ def _apply_story_refresh(raw_story_data, locale):
                     {
                         "label": "\"분위기 반전용 번개 프로모션 간다.\"",
                         "target_node": "route_partner_bridge_fail",
-                        "effect": "주사위 판정 High-risk branch. 성공: 분위기 반등. 실패: 추가 정리 지옥.",
+                        "effect": "고위험 분기. 성공: 분위기 반등. 실패: 추가 정리 지옥.",
                     },
                 ],
             },
