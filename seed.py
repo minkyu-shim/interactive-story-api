@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from app import create_app, db
 from app.models import Story, StoryNode, Choice
 
@@ -977,6 +979,147 @@ STORY_DATA_EN_RAW = {
 # ==========================================
 
 
+def _patch_choice(node, index, updates):
+    choices = node.get("choices")
+    if not isinstance(choices, list) or index < 0 or index >= len(choices):
+        return
+    choices[index].update(updates)
+
+
+def _apply_story_refresh(raw_story_data, locale):
+    refreshed = deepcopy(raw_story_data)
+    meta = refreshed.setdefault("project_meta", {})
+
+    if locale == "en":
+        meta["version"] = "1.7.0 (Story UX + Visual Roll Patch)"
+    else:
+        meta["version"] = "1.7.0 (Story UX + Visual Roll Patch)"
+
+    nodes = refreshed.get("story_nodes", [])
+    nodes_by_id = {node.get("id"): node for node in nodes if node.get("id")}
+
+    # Add deterministic illustration URLs per node so assets are stable between runs.
+    for node in nodes:
+        node_id = node.get("id")
+        if node_id and not node.get("illustration_url"):
+            node["illustration_url"] = f"https://picsum.photos/seed/{locale}-{node_id}/1280/720"
+
+    # Selective dice checks (not every choice), based on scene tension.
+    _patch_choice(
+        nodes_by_id.get("node_02_mini_event", {}),
+        1,
+        {
+            "target_node": "node_02_success",
+            "requires_roll": True,
+            "roll_sides": 20,
+            "roll_required": 12,
+            "on_fail_target": "node_02_fail",
+        },
+    )
+    _patch_choice(
+        nodes_by_id.get("node_03_mini_event", {}),
+        1,
+        {
+            "requires_roll": True,
+            "roll_sides": 20,
+            "roll_required": 11,
+            "on_fail_target": "node_03_fail",
+        },
+    )
+
+    if locale == "en":
+        text_updates = {
+            "node_01_prologue": (
+                "My life is one giant Segmentation Fault.\n\n"
+                "Algorithms is one exam away from an F, my beloved RTX 5070 died mid-benchmark, "
+                "and GTA 6 is still months away.\n\n"
+                "If this week crashes, so do I."
+            ),
+            "node_02_5_work_login": (
+                "Classes end, but survival mode starts.\n\n"
+                "If I want my GPU back, I need cash. So I clock into the night shift at Nexus PC Cafe.\n\n"
+                "Ramen steam, keyboard clacks, and tired eyes. Another raid begins."
+            ),
+            "node_03_5_weekend_anxiety": (
+                "Monday morning.\n\n"
+                "Dead GPU on my desk. Academic warning on my portal. "
+                "Both tabs are open, both are red.\n\n"
+                "By Friday, I either recover or hard fail."
+            ),
+            "node_04_climax_trigger": (
+                "Friday evening. Two notifications hit at the exact same time.\n\n"
+                "[Sujin]: All-night debug session. Miss this and your grade is over.\n"
+                "[Yuna]: Emergency shift. Cover tonight and Boss will match your GPU fund.\n\n"
+                "Single-thread life. You can only execute one branch."
+            ),
+            "node_05_branch_selection": "Which route gets priority in your queue?",
+            "sujin_mid_event": (
+                "4 AM. During code review, Sujin drifts asleep on your shoulder.\n"
+                "For the first time, there is no sarcasm, no walls, no compiler warnings."
+            ),
+            "yuna_mid_event": (
+                "Dawn after chaos. You survived the order rush and the owner hands over a thick envelope.\n"
+                "Enough for the GPU, maybe more. But now the choice costs more than money."
+            ),
+            "end_sujin_happy": (
+                "Sujin freezes, then laughs under her breath.\n"
+                "\"Are you... seriously confessing with algorithm jokes?\"\n\n"
+                "She squeezes your hand anyway.\n"
+                "\"Fine. Request approved. But if you ship bugs, I'm reviewing everything.\"\n\n"
+                "[Result] Straight A's + a relationship built on commits and trust."
+            ),
+            "end_sujin_bad": (
+                "Sujin nods once, expression locked behind her glasses.\n"
+                "\"Understood. Mentor mode complete. Good luck, junior.\"\n\n"
+                "You pass the semester, but leave with an unhandled exception in your chest."
+            ),
+            "end_yuna_happy": (
+                "Yuna blinks, speechless.\n"
+                "\"You'd delay the 5070... for my indie game?\"\n\n"
+                "\"Games run better in co-op,\" you say.\n\n"
+                "She hugs you and laughs through tears.\n"
+                "[Result] GPU delayed, future duo unlocked."
+            ),
+            "end_yuna_bad": (
+                "You buy the new GPU and max every setting.\n"
+                "The frame rate is perfect. The room is not.\n\n"
+                "Yuna goes silent, focusing on her own path.\n"
+                "Your monitor glows brighter than your life."
+            ),
+        }
+        for node_id, text in text_updates.items():
+            node = nodes_by_id.get(node_id)
+            if node:
+                node["text"] = text
+
+        _patch_choice(
+            nodes_by_id.get("node_02_mini_event", {}),
+            0,
+            {"effect": "Sujin Affection ++ (safe, high-confidence solution)"},
+        )
+        _patch_choice(
+            nodes_by_id.get("node_02_mini_event", {}),
+            1,
+            {
+                "label": "\"I can try a risky cache trick. If luck is on our side, it may run faster.\"",
+                "effect": "Dice Check d20 >= 12. Success: win respect. Fail: immediate scorn.",
+            },
+        )
+        _patch_choice(
+            nodes_by_id.get("node_03_mini_event", {}),
+            1,
+            {
+                "effect": "Dice Check d20 >= 11. Success: calm customer. Fail: scene escalates.",
+            },
+        )
+
+    return refreshed
+
+
+STORY_DATA_KR_RAW = _apply_story_refresh(STORY_DATA_KR_RAW, locale="kr")
+STORY_DATA_EN_RAW = _apply_story_refresh(STORY_DATA_EN_RAW, locale="en")
+
+
 def _normalize_content(node_data):
     if isinstance(node_data.get("content"), list):
         return node_data.get("content")
@@ -996,11 +1139,24 @@ def _normalize_choices(node_data, default_continue_text):
             next_page_id = choice_data.get("next_page_id") or choice_data.get("target_node")
             if not text or not next_page_id:
                 continue
-            normalized.append({
+            normalized_choice = {
                 "text": text,
                 "next_page_id": str(next_page_id),
                 "effect": choice_data.get("effect"),
-            })
+            }
+            requires_roll = bool(choice_data.get("requires_roll"))
+            if requires_roll:
+                normalized_choice["requires_roll"] = True
+                normalized_choice["roll_sides"] = int(choice_data.get("roll_sides") or 20)
+                normalized_choice["roll_required"] = int(choice_data.get("roll_required") or 1)
+                on_fail_target = (
+                    choice_data.get("on_fail_target")
+                    or choice_data.get("on_fail_target_node_custom_id")
+                    or choice_data.get("on_fail_target_node")
+                )
+                if on_fail_target:
+                    normalized_choice["on_fail_target"] = str(on_fail_target)
+            normalized.append(normalized_choice)
         return normalized
 
     next_node = node_data.get("next_page_id") or node_data.get("next_node")
@@ -1038,6 +1194,7 @@ def normalize_story_for_django(raw_story_data, default_continue_text="Continue")
             "type": node_type,
             "title": node_data.get("title"),
             "background": node_data.get("background"),
+            "illustration_url": node_data.get("illustration_url"),
             "content": _normalize_content(node_data),
             "text": node_data.get("text"),
             "affinity_change": node_data.get("affinity_change", {}),
@@ -1084,6 +1241,7 @@ def seed_story(story_data):
             custom_id=node_data["custom_id"],
             node_type=node_data.get("type", "narrative"),
             background=node_data.get("background"),
+            illustration_url=node_data.get("illustration_url"),
             content_data=node_data.get("content", []),
             affinity_change=node_data.get("affinity_change", {}),
             is_ending=node_data.get("is_ending", False),
@@ -1106,6 +1264,10 @@ def seed_story(story_data):
                 node_id=parent_node.id,
                 target_node_custom_id=choice_data["next_page_id"],
                 effect_description=choice_data.get("effect"),
+                requires_roll=bool(choice_data.get("requires_roll")),
+                roll_sides=choice_data.get("roll_sides"),
+                roll_required=choice_data.get("roll_required"),
+                on_fail_target_node_custom_id=choice_data.get("on_fail_target"),
             )
             db.session.add(choice)
 
