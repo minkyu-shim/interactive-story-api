@@ -101,6 +101,15 @@ class StoryListAPI(MethodView):
 
     def post(self):
         data = _json_payload()
+        payload_id = data.get("id")
+        if payload_id is not None:
+            try:
+                payload_id = int(payload_id)
+            except (TypeError, ValueError):
+                return jsonify({"error": "Invalid payload id. Use integer or omit 'id' when creating."}), 400
+            if db.session.get(Story, payload_id):
+                return jsonify({"error": f"Story {payload_id} already exists. Use PUT /api/stories/{payload_id}."}), 409
+
         new_story = Story(
             title=data.get("title") or "Untitled",
             description=data.get("description"),
@@ -122,6 +131,14 @@ class StoryDetailAPI(MethodView):
     def put(self, story_id):
         story = Story.query.get_or_404(story_id)
         data = _json_payload()
+        payload_id = data.get("id")
+        if payload_id is not None:
+            try:
+                payload_id = int(payload_id)
+            except (TypeError, ValueError):
+                return jsonify({"error": "Invalid payload id. Use integer id."}), 400
+            if payload_id != story_id:
+                return jsonify({"error": f"Payload id {payload_id} does not match URL id {story_id}."}), 400
 
         story.title = data.get("title", story.title)
         story.description = data.get("description", story.description)
