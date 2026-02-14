@@ -42,7 +42,12 @@ class StoryNode(db.Model):
     is_ending = db.Column(db.Boolean, default=False)
     ending_outcome = db.Column(db.String(100), nullable=True)
 
-    choices = db.relationship("Choice", backref="source_node", foreign_keys="Choice.node_id")
+    choices = db.relationship(
+        "Choice",
+        backref="source_node",
+        foreign_keys="Choice.node_id",
+        cascade="all, delete-orphan",
+    )
 
     def to_dict(self):
         text = ""
